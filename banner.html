@@ -17,129 +17,84 @@
     });
     three = mathbox.three;
 
-    three.camera.position.set(2.3, 1, 2);
-    three.renderer.setClearColor(new THREE.Color(0xFFFFFF), 1.0);
+    three.camera.position.set(3.5, 1.4, -2.3);
+    three.renderer.setClearColor(new THREE.Color(0x204060), 1.0);
 
     time = 0
-    angle = 0
-    deform = 0
-    skew = 0
-
-    fa = 6
-    fb = 4
-
     three.on('update', function () {
-      time = three.Time.clock * .6
-      angle = wobbler(time / 5) * .6 + π/4 + .2;
-      skew = wobbler(time / 16.1) * .25;
-      deform = wobbler(time / 7.1)
+      clock = three.Time.clock
+      time = clock / 4
 
-      if (deform == 0) {
-        fa = (Math.ceil(Math.random() * 2) + 1) * 2
-        fb = (Math.ceil(Math.random() * 2) + 1) * 2
-      }
+      t = Math.max(clock - 1, 0) / 12
+      t = t < .5 ? t * t : t - .25
 
-      deform *= cosineEase(time - 2)
+      o = .5 - .5 * Math.cos(Math.min(1, t) * π)
+
+      c = Math.cos(t);
+      s = Math.sin(t);
+      view.set('quaternion', [0, -s, 0, c]);
+      surface.set('opacity', 1 - o * .25);
+
+      f = 1 + o;
+      view.set('range', [[-3 * f, 3 * f], [0, 6], [-3 * f, 3 * f]]);
+      view.set('scale', [2*f, 2, 2*f]);
     });
-
-    clamp = function (x, a, b) {
-      return Math.max(a, Math.min(b, x));
-    };
-
-    cosineEase = function (t) {
-      return .5 - .5 * Math.cos(clamp(t, 0, 1) * π);
-    };
-
-    wobbler = function (t) {
-      t = Math.sin(Math.min(1, Math.max(-1, .7*Math.asin(Math.cos(π*t))))*τ/4);
-      return t*.5-.5;
-    };
-
-    hopf = function (emit, ϕ, θ, γ) {
-      η  = θ / 2 + (Math.cos(ϕ * 2 + time) * skew + Math.cos(ϕ * fa)) * .15 * deform
-      ξ1 = ϕ + Math.cos(γ * fb + time)*.25 * deform
-      ξ2 = γ
-
-      sum  = ξ1 + ξ2
-      diff = ξ1 - ξ2
-
-      s = Math.sin(η)
-      c = Math.cos(η)
-
-      x = Math.cos(sum)  * s
-      y = Math.sin(sum)  * s
-      z = Math.cos(diff) * c
-      w = Math.sin(diff) * c
-
-      emit(z, y, w, x);
-    };
 
     view = mathbox
       .unit({
-        scale: 500,
+        scale: 720,
       })
-      .stereographic4({
-        range: [[-4, 4], [-4, 4], [-4, 4], [-1, 1]],
-        scale: [4, 4, 4, 1],
+      .cartesian({
+        range: [[-3, 3], [0, 6], [-3, 3]],
+        scale: [2, 2, 2],
       });
 
-    view.area({
-      rangeX: [-π, π],
-      rangeY: [-π/2, π/2],
-      width: 127,
-      height: 16,
-      centeredX: false,
-      centeredY: true,
-      expr: function (emit, x, y, i, j) {
-        ϕ = y
-        θ = angle
-        hopf(emit, ϕ, θ, x);
-      },
-      channels: 4,
-    });
-    view.line({
-      color: 0x3080FF,
-      zBias: 10,
-      width: 3
+    view.grid({
+      width: 5,
+      opacity: 0.5,
+      axes: [1, 3],
     });
 
     view.area({
-      rangeX: [-π, π],
-      rangeY: [-.6, .6],
-      width: 127,
-      height: 63,
+      width: 36,
+      height: 36,
+      items: 2,
+      axes: [1, 3],
       expr: function (emit, x, y, i, j) {
-        ϕ = y + time
-        θ = angle
-        hopf(emit, ϕ, θ, x);
+        a = (Math.sin(i * 31.718 - time) * Math.sin(j * 21.131 + time))
+        b = (Math.sin(i * 27.41 + time) * Math.sin(j * 11.91 + 5 * Math.cos(i * 4.1) + time))
+        emit(x, 3 * (1 + a), y);
+        emit(x, 3 * (1 + a + b * .25), y);
       },
-      channels: 4,
+      channels: 3,
+    });
+    view.vector({
+      color: 0xA0D0FF,
+      width: 5,
+      start: false,
+      end: true,
+    });
+
+    view.area({
+      id: 'sampler',
+      width: 83,
+      height: 83,
+      axes: [1, 3],
+      expr: function (emit, x, y, i, j) {
+        emit(x, 3 * (.5 + .5 * (Math.sin(x + time) * Math.sin(y + time))), y);
+      },
+      channels: 3,
     });
     view.surface({
+      lineX: true,
+      lineY: true,
       shaded: true,
-      color: 0x3080FF,
-      zBias: -5,
+      color: 0x5090FF,
+      width: 5,
     });
 
-    view.area({
-      rangeX: [-π, π],
-      rangeY: [-π/2, π/2],
-      width: 127,
-      height: 63,
-      expr: function (emit, x, y, i, j) {
-        ϕ = y
-        θ = angle
-        hopf(emit, ϕ, θ, x);
-      },
-      channels: 4,
-    });
-    view.surface({
-      shaded: true,
-      color: 0xffffff,
-      opacity: .5,
-      zBias: -10,
-    });
-
+    surface = mathbox.select('surface')
+    vector = mathbox.select('vector')
 
   </script>
 </body>
